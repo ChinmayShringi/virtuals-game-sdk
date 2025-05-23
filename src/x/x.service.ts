@@ -2,13 +2,7 @@
 /* eslint-disable @typescript-eslint/no-unsafe-assignment */
 import { Injectable, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import {
-  GameAgent,
-  LLMModel,
-  GameFunction,
-  ExecutableGameFunctionResponse,
-  ExecutableGameFunctionStatus,
-} from '@virtuals-protocol/game';
+import { GameAgent, LLMModel } from '@virtuals-protocol/game';
 import { TwitterApi } from '@virtuals-protocol/game-twitter-node';
 import TwitterPlugin from '@virtuals-protocol/game-twitter-plugin';
 
@@ -28,39 +22,6 @@ export class XService implements OnModuleInit {
       gameTwitterAccessToken: this.configService.get<string>(
         'GAME_TWITTER_ACCESS_TOKEN',
       )!,
-    });
-
-    // Create post tweet function
-    const postTweetFunction = new GameFunction({
-      name: 'post_tweet',
-      description: 'Post a tweet',
-      args: [
-        { name: 'tweet', description: 'The tweet content' },
-        {
-          name: 'tweet_reasoning',
-          description: 'The reasoning behind the tweet',
-        },
-      ] as const,
-      executable: async (args, logger) => {
-        try {
-          logger(`Posting tweet: ${args.tweet}`);
-          logger(`Reasoning: ${args.tweet_reasoning}`);
-
-          const response = await this.twitterClient.v2.tweet(args.tweet);
-          console.log('Tweet posted:', response);
-
-          return new ExecutableGameFunctionResponse(
-            ExecutableGameFunctionStatus.Done,
-            'Tweet posted successfully',
-          );
-        } catch (e) {
-          console.error('Failed to post tweet:', e);
-          return new ExecutableGameFunctionResponse(
-            ExecutableGameFunctionStatus.Failed,
-            'Failed to post tweet',
-          );
-        }
-      },
     });
 
     // Create Twitter plugin
@@ -89,14 +50,13 @@ export class XService implements OnModuleInit {
   /**
    * Post a new tweet
    */
-  async postTweet(content: string, reasoning: string): Promise<void> {
+  async postTweet(content: string): Promise<void> {
     try {
       // Post tweet directly using Twitter client
       const response = await this.twitterClient.v2.tweet(content);
       console.log('Tweet posted:', response);
     } catch (error) {
       console.error('Error posting tweet:', error);
-      
       // Handle rate limits
       if (error.code === 429) {
         console.log('Rate limit hit, waiting for reset...');
@@ -115,6 +75,37 @@ export class XService implements OnModuleInit {
       }
 
       throw new Error(`Failed to post tweet: ${error.message}`);
+    }
+  }
+
+  /**
+   * Reply to a tweet
+   */
+  async replyToTweet(tweetId: string, replyContent: string): Promise<void> {
+    try {
+      // Reply to tweet using Twitter client
+      const response = await this.twitterClient.v2.reply(replyContent, tweetId);
+      console.log('Reply posted:', response);
+    } catch (error) {
+      console.error('Error replying to tweet:', error);
+      // Handle rate limits
+      if (error.code === 429) {
+        console.log('Rate limit hit, waiting for reset...');
+        const resetTime = error.headers['x-ratelimit-reset'];
+        throw new Error(
+          `Rate limit exceeded. Please try again after ${resetTime}`,
+        );
+      }
+
+      // Handle other errors
+      if (error.code === 400) {
+        console.log('Bad request, checking authentication...');
+        throw new Error(
+          'Authentication error. Please check your Twitter credentials.',
+        );
+      }
+
+      throw new Error(`Failed to reply to tweet: ${error.message}`);
     }
   }
 

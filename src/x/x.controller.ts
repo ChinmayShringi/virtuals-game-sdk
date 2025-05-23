@@ -1,5 +1,11 @@
 import { Controller, Get, Post, Body, Query } from '@nestjs/common';
-import { ApiOperation, ApiQuery, ApiResponse, ApiTags, ApiBody } from '@nestjs/swagger';
+import {
+  ApiOperation,
+  ApiQuery,
+  ApiResponse,
+  ApiTags,
+  ApiBody,
+} from '@nestjs/swagger';
 import { XService, Thread } from './x.service';
 
 @ApiTags('Threads')
@@ -49,19 +55,38 @@ export class XController {
       type: 'object',
       properties: {
         content: { type: 'string', description: 'Tweet content' },
-        reasoning: { type: 'string', description: 'Reasoning behind the tweet' },
       },
-      required: ['content', 'reasoning'],
+      required: ['content'],
     },
   })
   @ApiResponse({
     status: 201,
     description: 'Tweet posted successfully',
   })
-  async postTweet(
+  async postTweet(@Body('content') content: string): Promise<void> {
+    await this.xService.postTweet(content);
+  }
+
+  @Post('reply')
+  @ApiOperation({ summary: 'Reply to a tweet' })
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        tweetId: { type: 'string', description: 'ID of the tweet to reply to' },
+        content: { type: 'string', description: 'Reply content' },
+      },
+      required: ['tweetId', 'content'],
+    },
+  })
+  @ApiResponse({
+    status: 201,
+    description: 'Reply posted successfully',
+  })
+  async replyToTweet(
+    @Body('tweetId') tweetId: string,
     @Body('content') content: string,
-    @Body('reasoning') reasoning: string,
   ): Promise<void> {
-    await this.xService.postTweet(content, reasoning);
+    await this.xService.replyToTweet(tweetId, content);
   }
 }

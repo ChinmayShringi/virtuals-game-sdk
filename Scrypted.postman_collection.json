@@ -1,0 +1,91 @@
+{
+	"info": {
+		"_postman_id": "f544ffd8-f35e-433d-85e6-63260eef39d4",
+		"name": "X Thread API",
+		"description": "Collection for X Thread API endpoints using Twitter integration",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+		"_exporter_id": "7406313"
+	},
+	"item": [
+		{
+			"name": "Create Thread (Tweet)",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \"title\": \"My First Tweet\",\n    \"body\": [\"Hello, this is my first tweet!\"]\n}"
+				},
+				"url": {
+					"raw": "{{baseUrl}}/{{apiPrefix}}/x/thread",
+					"host": ["{{baseUrl}}"],
+					"path": ["{{apiPrefix}}", "x", "thread"]
+				},
+				"description": "Create a new thread (tweet) with title and initial message"
+			}
+		},
+		{
+			"name": "Reply to Thread (Tweet)",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \"body\": \"This is my reply to the tweet\"\n}"
+				},
+				"url": {
+					"raw": "{{baseUrl}}/{{apiPrefix}}/x/thread/{{tweetId}}/reply",
+					"host": ["{{baseUrl}}"],
+					"path": ["{{apiPrefix}}", "x", "thread", "{{tweetId}}", "reply"]
+				},
+				"description": "Add a reply to an existing thread (tweet)"
+			}
+		},
+		{
+			"name": "Get Thread (Tweet)",
+			"request": {
+				"method": "GET",
+				"url": {
+					"raw": "{{baseUrl}}/{{apiPrefix}}/x/thread/{{tweetId}}",
+					"host": ["{{baseUrl}}"],
+					"path": ["{{apiPrefix}}", "x", "thread", "{{tweetId}}"]
+				},
+				"description": "Get a thread (tweet) by its ID"
+			}
+		},
+		{
+			"name": "List Threads (Tweets)",
+			"request": {
+				"method": "GET",
+				"url": {
+					"raw": "{{baseUrl}}/{{apiPrefix}}/x/thread?page=1&limit=10",
+					"host": ["{{baseUrl}}"],
+					"path": ["{{apiPrefix}}", "x", "thread"],
+					"query": [
+						{
+							"key": "page",
+							"value": "1",
+							"description": "Page number (default: 1)"
+						},
+						{
+							"key": "limit",
+							"value": "10",
+							"description": "Number of items per page (default: 10)"
+						}
+					]
+				},
+				"description": "Get a paginated list of threads (tweets)"
+			}
+		}
+	]
+}

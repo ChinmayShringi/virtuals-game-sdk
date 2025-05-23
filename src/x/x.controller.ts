@@ -39,6 +39,6 @@ export class XController {
     @Query('page') page?: number,
     @Query('limit') limit?: number,
   ): Promise<Thread[]> {
-    return this.xService.listThreads(page, limit);
+    return this.xService.listThreads();
   }
-} 
+}

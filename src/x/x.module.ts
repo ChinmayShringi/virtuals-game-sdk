@@ -1,16 +1,19 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
-import { GameModule } from '../game/game.module';
 import { XController } from './x.controller';
 import { XService } from './x.service';
+import { configuration, validate } from '../config/configuration';
 
 @Module({
   imports: [
-    ConfigModule,
-    GameModule,
+    ConfigModule.forRoot({
+      load: [configuration],
+      validate,
+      isGlobal: true,
+    }),
   ],
   controllers: [XController],
   providers: [XService],
   exports: [XService],
 })
-export class XModule {} 
+export class XModule {}

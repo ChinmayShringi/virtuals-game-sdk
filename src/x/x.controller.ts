@@ -1,12 +1,13 @@
-import { Controller, Get, Post, Body, Query } from '@nestjs/common';
+import { Controller, Get, Post, Body, Query, Param } from '@nestjs/common';
 import {
   ApiOperation,
   ApiQuery,
   ApiResponse,
   ApiTags,
   ApiBody,
+  ApiParam,
 } from '@nestjs/swagger';
-import { XService, Thread } from './x.service';
+import { XService, Thread, TweetAnalytics } from './x.service';
 
 @ApiTags('Threads')
 @Controller('x')
@@ -88,5 +89,47 @@ export class XController {
     @Body('content') content: string,
   ): Promise<void> {
     await this.xService.replyToTweet(tweetId, content);
+  }
+
+  @Post('like/:tweetId')
+  @ApiOperation({ summary: 'Like a tweet' })
+  @ApiParam({
+    name: 'tweetId',
+    description: 'ID of the tweet to like',
+  })
+  @ApiResponse({
+    status: 201,
+    description: 'Tweet liked successfully',
+  })
+  async likeTweet(@Param('tweetId') tweetId: string): Promise<void> {
+    await this.xService.likeTweet(tweetId);
+  }
+
+  @Get('analytics/:tweetId')
+  @ApiOperation({ summary: 'Get tweet analytics' })
+  @ApiParam({
+    name: 'tweetId',
+    description: 'ID of the tweet to get analytics for',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Tweet analytics',
+    schema: {
+      type: 'object',
+      properties: {
+        id: { type: 'string' },
+        text: { type: 'string' },
+        likes: { type: 'number' },
+        retweets: { type: 'number' },
+        replies: { type: 'number' },
+        views: { type: 'number' },
+        created_at: { type: 'string' },
+      },
+    },
+  })
+  async getTweetAnalytics(
+    @Param('tweetId') tweetId: string,
+  ): Promise<TweetAnalytics> {
+    return this.xService.getTweetAnalytics(tweetId);
   }
 }

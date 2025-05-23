@@ -11,6 +11,16 @@ export interface Thread {
   title: string;
 }
 
+export interface TweetAnalytics {
+  id: string;
+  text: string;
+  likes: number;
+  retweets: number;
+  replies: number;
+  views: number;
+  created_at: string;
+}
+
 @Injectable()
 export class XService implements OnModuleInit {
   private agent: GameAgent;
@@ -166,6 +176,87 @@ export class XService implements OnModuleInit {
       }
 
       throw new Error(`Failed to fetch threads: ${error.message}`);
+    }
+  }
+
+  /**
+   * Like a tweet
+   */
+  async likeTweet(tweetId: string): Promise<void> {
+    try {
+      // Get current user ID first
+      const me = await this.twitterClient.v2.me();
+      console.log('User info:', me);
+
+      // Like the tweet using both user ID and tweet ID
+      const response = await this.twitterClient.v2.like(me.data.id, tweetId);
+      console.log('Tweet liked:', response);
+    } catch (error) {
+      console.error('Error liking tweet:', error);
+      // Handle rate limits
+      if (error.code === 429) {
+        console.log('Rate limit hit, waiting for reset...');
+        const resetTime = error.headers['x-ratelimit-reset'];
+        throw new Error(
+          `Rate limit exceeded. Please try again after ${resetTime}`,
+        );
+      }
+
+      // Handle other errors
+      if (error.code === 400) {
+        console.log('Bad request, checking authentication...');
+        throw new Error(
+          'Authentication error. Please check your Twitter credentials.',
+        );
+      }
+
+      throw new Error(`Failed to like tweet: ${error.message}`);
+    }
+  }
+
+  /**
+   * Get tweet analytics
+   */
+  async getTweetAnalytics(tweetId: string): Promise<TweetAnalytics> {
+    try {
+      const tweet = await this.twitterClient.v2.singleTweet(tweetId, {
+        'tweet.fields': ['public_metrics', 'created_at'],
+      });
+      console.log('Tweet analytics:', tweet);
+
+      if (!tweet?.data) {
+        throw new Error('Tweet not found');
+      }
+
+      return {
+        id: tweet.data.id,
+        text: tweet.data.text,
+        likes: tweet.data.public_metrics.like_count,
+        retweets: tweet.data.public_metrics.retweet_count,
+        replies: tweet.data.public_metrics.reply_count,
+        views: tweet.data.public_metrics.impression_count,
+        created_at: tweet.data.created_at,
+      };
+    } catch (error) {
+      console.error('Error getting tweet analytics:', error);
+      // Handle rate limits
+      if (error.code === 429) {
+        console.log('Rate limit hit, waiting for reset...');
+        const resetTime = error.headers['x-ratelimit-reset'];
+        throw new Error(
+          `Rate limit exceeded. Please try again after ${resetTime}`,
+        );
+      }
+
+      // Handle other errors
+      if (error.code === 400) {
+        console.log('Bad request, checking authentication...');
+        throw new Error(
+          'Authentication error. Please check your Twitter credentials.',
+        );
+      }
+
+      throw new Error(`Failed to get tweet analytics: ${error.message}`);
     }
   }
 }

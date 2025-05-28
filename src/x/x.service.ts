@@ -21,6 +21,20 @@ export interface TweetAnalytics {
   created_at: string;
 }
 
+export interface TweetMention {
+  id: string;
+  text: string;
+  author_id: string;
+  author_username: string;
+  author_name: string;
+  created_at: string;
+}
+
+export interface ThreadPost {
+  content: string;
+  mentions?: string[];
+}
+
 @Injectable()
 export class XService implements OnModuleInit {
   private agent: GameAgent;
@@ -31,7 +45,7 @@ export class XService implements OnModuleInit {
     this.twitterClient = new TwitterApi({
       gameTwitterAccessToken: this.configService.get<string>(
         'GAME_TWITTER_ACCESS_TOKEN',
-      )!,
+      ),
     });
 
     // Create Twitter plugin
@@ -40,16 +54,13 @@ export class XService implements OnModuleInit {
     });
 
     // Create your agent with the Twitter plugin worker
-    this.agent = new GameAgent(
-      this.configService.get<string>('GAME_API_KEY')!,
-      {
-        name: 'Threads Bot',
-        goal: 'List and manage threads',
-        description: 'A bot that lists and manages threads',
-        llmModel: LLMModel.DeepSeek_R1,
-        workers: [twitterPlugin.getWorker()],
-      },
-    );
+    this.agent = new GameAgent(this.configService.get<string>('GAME_API_KEY'), {
+      name: 'Threads Bot',
+      goal: 'List and manage threads',
+      description: 'A bot that lists and manages threads',
+      llmModel: LLMModel.DeepSeek_R1,
+      workers: [twitterPlugin.getWorker()],
+    });
   }
 
   // initialize once
@@ -58,12 +69,17 @@ export class XService implements OnModuleInit {
   }
 
   /**
-   * Post a new tweet
+   * Post a new tweet with optional mentions
    */
-  async postTweet(content: string): Promise<void> {
+  async postTweet(content: string, mentions?: string[]): Promise<void> {
     try {
+      // Format mentions if provided
+      const formattedContent = mentions?.length
+        ? `${content}\n\n${mentions.map((m) => `@${m}`).join(' ')}`
+        : content;
+
       // Post tweet directly using Twitter client
-      const response = await this.twitterClient.v2.tweet(content);
+      const response = await this.twitterClient.v2.tweet(formattedContent);
       console.log('Tweet posted:', response);
     } catch (error) {
       console.error('Error posting tweet:', error);
@@ -85,6 +101,61 @@ export class XService implements OnModuleInit {
       }
 
       throw new Error(`Failed to post tweet: ${error.message}`);
+    }
+  }
+
+  /**
+   * Post a thread with mentions
+   */
+  async postThread(threadPosts: ThreadPost[]): Promise<void> {
+    try {
+      if (!threadPosts.length) {
+        throw new Error('Thread must contain at least one post');
+      }
+
+      let previousTweetId: string | undefined;
+
+      // Post each tweet in the thread
+      for (const post of threadPosts) {
+        const formattedContent = post.mentions?.length
+          ? `${post.content}\n\n${post.mentions.map((m) => `@${m}`).join(' ')}`
+          : post.content;
+
+        if (previousTweetId) {
+          // Reply to the previous tweet
+          const response = await this.twitterClient.v2.reply(
+            formattedContent,
+            previousTweetId,
+          );
+          console.log('Thread reply posted:', response);
+          previousTweetId = response.data.id;
+        } else {
+          // Post the first tweet
+          const response = await this.twitterClient.v2.tweet(formattedContent);
+          console.log('Thread starter posted:', response);
+          previousTweetId = response.data.id;
+        }
+      }
+    } catch (error) {
+      console.error('Error posting thread:', error);
+      // Handle rate limits
+      if (error.code === 429) {
+        console.log('Rate limit hit, waiting for reset...');
+        const resetTime = error.headers['x-ratelimit-reset'];
+        throw new Error(
+          `Rate limit exceeded. Please try again after ${resetTime}`,
+        );
+      }
+
+      // Handle other errors
+      if (error.code === 400) {
+        console.log('Bad request, checking authentication...');
+        throw new Error(
+          'Authentication error. Please check your Twitter credentials.',
+        );
+      }
+
+      throw new Error(`Failed to post thread: ${error.message}`);
     }
   }
 
@@ -257,6 +328,73 @@ export class XService implements OnModuleInit {
       }
 
       throw new Error(`Failed to get tweet analytics: ${error.message}`);
+    }
+  }
+
+  /**
+   * Get mentions for the authenticated user
+   */
+  async getMentions(page = 1, limit = 10): Promise<TweetMention[]> {
+    try {
+      // Get current user ID first
+      const me = await this.twitterClient.v2.me();
+      console.log('User info:', me);
+
+      // Get mentions using v2 API
+      const mentions = await this.twitterClient.v2.userMentionTimeline(
+        me.data.id,
+        {
+          max_results: 100,
+          'tweet.fields': ['created_at', 'author_id'],
+          expansions: ['author_id'],
+          'user.fields': ['username', 'name'],
+        },
+      );
+      console.log('Raw mentions response:', mentions);
+
+      if (!mentions?.data?.data) {
+        console.log('No mentions found, returning empty array');
+        return [];
+      }
+
+      // Map the response to our TweetMention interface
+      const mappedMentions: TweetMention[] = mentions.data.data.map((tweet) => {
+        const author = mentions.includes.users.find(
+          (user) => user.id === tweet.author_id,
+        );
+        return {
+          id: tweet.id,
+          text: tweet.text,
+          author_id: tweet.author_id,
+          author_username: author?.username || '',
+          author_name: author?.name || '',
+          created_at: tweet.created_at,
+        };
+      });
+
+      // Apply pagination
+      const start = (page - 1) * limit;
+      return mappedMentions.slice(start, start + limit);
+    } catch (error) {
+      console.error('Error getting mentions:', error);
+      // Handle rate limits
+      if (error.code === 429) {
+        console.log('Rate limit hit, waiting for reset...');
+        const resetTime = error.headers['x-ratelimit-reset'];
+        throw new Error(
+          `Rate limit exceeded. Please try again after ${resetTime}`,
+        );
+      }
+
+      // Handle other errors
+      if (error.code === 400) {
+        console.log('Bad request, checking authentication...');
+        throw new Error(
+          'Authentication error. Please check your Twitter credentials.',
+        );
+      }
+
+      throw new Error(`Failed to get mentions: ${error.message}`);
     }
   }
 }

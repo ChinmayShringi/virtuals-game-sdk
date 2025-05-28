@@ -35,6 +35,15 @@ export interface ThreadPost {
   mentions?: string[];
 }
 
+export interface MentionedPost {
+  tweet_id: string;
+  thread_id: string;
+  text: string;
+  author_username: string;
+  author_name: string;
+  created_at: string;
+}
+
 @Injectable()
 export class XService implements OnModuleInit {
   private agent: GameAgent;
@@ -395,6 +404,72 @@ export class XService implements OnModuleInit {
       }
 
       throw new Error(`Failed to get mentions: ${error.message}`);
+    }
+  }
+
+  /**
+   * Search for posts mentioning a specific user
+   */
+  async searchUserMentions(
+    username: string,
+    limit = 20,
+  ): Promise<MentionedPost[]> {
+    try {
+      // First, get the user ID from username
+      const user = await this.twitterClient.v2.userByUsername(username);
+      if (!user?.data?.id) {
+        throw new Error(`User @${username} not found`);
+      }
+
+      // Search for tweets mentioning the user
+      const tweets = await this.twitterClient.v2.search(`@${username}`, {
+        max_results: limit,
+        'tweet.fields': ['created_at', 'conversation_id', 'author_id'],
+        expansions: ['author_id'],
+        'user.fields': ['username', 'name'],
+      });
+
+      if (!tweets?.data?.data) {
+        console.log('No mentions found, returning empty array');
+        return [];
+      }
+
+      // Map the response to our MentionedPost interface
+      const mentionedPosts: MentionedPost[] = tweets.data.data.map((tweet) => {
+        const author = tweets.includes.users.find(
+          (user) => user.id === tweet.author_id,
+        );
+        return {
+          tweet_id: tweet.id,
+          thread_id: tweet.conversation_id,
+          text: tweet.text,
+          author_username: author?.username || '',
+          author_name: author?.name || '',
+          created_at: tweet.created_at,
+        };
+      });
+
+      return mentionedPosts;
+    } catch (error) {
+      console.error('Error searching user mentions:', error);
+      // Handle rate limits
+      if (error.code === 429) {
+        console.log('Rate limit hit, waiting for reset...');
+        const resetTime = error.headers['x-ratelimit-reset'];
+        throw new Error(
+          `Rate limit exceeded. Please try again after ${resetTime}`,
+        );
+      }
+
+      // Handle other errors
+      if (error.code === 400) {
+        console.log('Bad request, checking authentication...');
+        throw new Error(
+          'Authentication error. Please check your Twitter credentials.',
+        );
+      }
+
+      throw new Error(`Failed to search user mentions: ${error.message}`);
     }
   }
 }

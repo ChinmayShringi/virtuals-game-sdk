@@ -13,6 +13,7 @@ import {
   TweetAnalytics,
   TweetMention,
   ThreadPost,
+  MentionedPost,
 } from './x.service';
 
 @ApiTags('Threads')
@@ -218,5 +219,42 @@ export class XController {
   })
   async postThread(@Body('posts') posts: ThreadPost[]): Promise<void> {
     await this.xService.postThread(posts);
+  }
+
+  @Get('mentions/search/:username')
+  @ApiOperation({ summary: 'Search for posts mentioning a specific user' })
+  @ApiParam({
+    name: 'username',
+    description: 'Username to search for (without @)',
+  })
+  @ApiQuery({
+    name: 'limit',
+    required: false,
+    type: Number,
+    description: 'Maximum number of results to return (default: 20)',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'List of posts mentioning the user',
+    schema: {
+      type: 'array',
+      items: {
+        type: 'object',
+        properties: {
+          tweet_id: { type: 'string' },
+          thread_id: { type: 'string' },
+          text: { type: 'string' },
+          author_username: { type: 'string' },
+          author_name: { type: 'string' },
+          created_at: { type: 'string' },
+        },
+      },
+    },
+  })
+  async searchUserMentions(
+    @Param('username') username: string,
+    @Query('limit') limit?: number,
+  ): Promise<MentionedPost[]> {
+    return this.xService.searchUserMentions(username, limit);
   }
 }
